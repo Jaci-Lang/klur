@@ -19,8 +19,14 @@ jobs:
       - name: Download Pre-compiled Jaci / Luau Engine (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=jaci" | jq -r '.artifacts["x86_64-unknown-linux-gnu"].url')
-          curl -fSL -o luau-ubuntu.zip "$URL"
+          set -euo pipefail
+          REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
+          DL=$(curl -fsSL "$REL" | jq -r '.assets[] | select(.name=="luau-x86_64-unknown-linux-gnu.zip") | .download_url')
+          if [[ -z "$DL" || "$DL" == "null" ]]; then
+            echo "Could not resolve Jaci artifact URL for x86_64-unknown-linux-gnu"
+            exit 1
+          fi
+          curl -fSL -o luau-ubuntu.zip "https://pop.squareweb.app$DL"
           unzip -o -q luau-ubuntu.zip -d /tmp/jaci
           chmod +x /tmp/jaci/*
           sudo cp /tmp/jaci/luau /usr/local/bin/luau || sudo cp /tmp/jaci/luau* /usr/local/bin/luau || true
@@ -28,8 +34,14 @@ jobs:
       - name: Download Pre-compiled Jaci / Luau Engine (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=jaci" | jq -r '.artifacts["x86_64-apple-darwin"].url')
-          curl -fSL -o luau-macos.zip "$URL"
+          set -euo pipefail
+          REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
+          DL=$(curl -fsSL "$REL" | jq -r '.assets[] | select(.name=="luau-x86_64-apple-darwin.zip") | .download_url')
+          if [[ -z "$DL" || "$DL" == "null" ]]; then
+            echo "Could not resolve Jaci artifact URL for x86_64-apple-darwin"
+            exit 1
+          fi
+          curl -fSL -o luau-macos.zip "https://pop.squareweb.app$DL"
           unzip -o -q luau-macos.zip -d /tmp/jaci
           chmod +x /tmp/jaci/*
           sudo cp /tmp/jaci/luau /usr/local/bin/luau || cp /tmp/jaci/luau /usr/local/bin/luau || true
@@ -38,8 +50,13 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
+          $ErrorActionPreference = "Stop"
           $json = Invoke-RestMethod -Uri "https://pop.squareweb.app/v1/releases/latest?product=jaci"
-          $url = $json.artifacts."x86_64-pc-windows-msvc".url
+          $asset = $json.assets | Where-Object { $_.name -eq "luau-x86_64-pc-windows-msvc.zip" } | Select-Object -First 1
+          if (-not $asset) {
+            throw "Could not resolve Jaci artifact URL for x86_64-pc-windows-msvc"
+          }
+          $url = "https://pop.squareweb.app" + $asset.download_url
           Invoke-WebRequest -Uri $url -OutFile luau-windows.zip
           Expand-Archive -Path luau-windows.zip -DestinationPath C:\jaci -Force
           echo "C:\jaci" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append

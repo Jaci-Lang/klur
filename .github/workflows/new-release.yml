@@ -51,15 +51,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=jaci" \
-            | jq -r '.artifacts["${{ matrix.os.name }}"].url')
+          REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
+          NAME="luau-${{ matrix.os.name }}.zip"
+          DL=$(curl -fsSL "$REL" \
+            | jq -r ".assets[] | select(.name==\"$NAME\") | .download_url")
 
-          if [[ -z "$URL" || "$URL" == "null" ]]; then
-            echo "Could not resolve Luau artifact URL for ${{ matrix.os.name }}"
+          if [[ -z "$DL" || "$DL" == "null" ]]; then
+            echo "Could not resolve Jaci artifact URL for ${{ matrix.os.name }}"
             exit 1
           fi
 
-          curl -fSL -o luau-ubuntu.zip "$URL"
+          curl -fSL -o luau-ubuntu.zip "https://pop.squareweb.app$DL"
 
           rm -rf /tmp/jaci
           mkdir -p /tmp/jaci
@@ -77,15 +79,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=jaci" \
-            | jq -r '.artifacts["${{ matrix.os.name }}"].url')
+          REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
+          NAME="luau-${{ matrix.os.name }}.zip"
+          DL=$(curl -fsSL "$REL" \
+            | jq -r ".assets[] | select(.name==\"$NAME\") | .download_url")
 
-          if [[ -z "$URL" || "$URL" == "null" ]]; then
-            echo "Could not resolve Luau artifact URL for ${{ matrix.os.name }}"
+          # The Jaci engine only ships x86_64-apple-darwin; Apple Silicon runners
+          # (aarch64-apple-darwin) fall back to it via Rosetta.
+          if [[ -z "$DL" || "$DL" == "null" ]]; then
+            DL=$(curl -fsSL "$REL" \
+              | jq -r '.assets[] | select(.name=="luau-x86_64-apple-darwin.zip") | .download_url')
+          fi
+
+          if [[ -z "$DL" || "$DL" == "null" ]]; then
+            echo "Could not resolve Jaci artifact URL for ${{ matrix.os.name }}"
             exit 1
           fi
 
-          curl -fSL -o luau-macos.zip "$URL"
+          curl -fSL -o luau-macos.zip "https://pop.squareweb.app$DL"
 
           rm -rf /tmp/jaci
           mkdir -p /tmp/jaci
@@ -106,11 +117,14 @@ jobs:
           $json = Invoke-RestMethod `
             -Uri "https://pop.squareweb.app/v1/releases/latest?product=jaci"
 
-          $url = $json.artifacts."${{ matrix.os.name }}".url
+          $name = "luau-$(${{ matrix.os.name }}).zip"
+          $asset = $json.assets | Where-Object { $_.name -eq $name } | Select-Object -First 1
 
-          if (-not $url) {
-            throw "Could not resolve Luau artifact URL for ${{ matrix.os.name }}"
+          if (-not $asset) {
+            throw "Could not resolve Jaci artifact URL for ${{ matrix.os.name }}"
           }
+
+          $url = "https://pop.squareweb.app" + $asset.download_url
 
           Invoke-WebRequest `
             -Uri $url `
