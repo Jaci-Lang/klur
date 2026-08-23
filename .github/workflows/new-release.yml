@@ -58,15 +58,28 @@ jobs:
 
           REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
 
-          DL=$(curl -fsSL "$REL" \
-            | jq -r ".assets[] | select(.name==\"$ENGINE\") | .download_url")
+          # The releases API is briefly inconsistent while a new release is
+          # being published; retry before failing.
+          DL=""
+          for attempt in 1 2 3; do
+            DL=$(curl -fsSL "$REL" \
+              | jq -r ".assets[] | select(.name==\"$ENGINE\") | .download_url" \
+              | head -n 1 || true)
+            if [[ -n "$DL" && "$DL" != "null" ]]; then
+              break
+            fi
+            echo "Attempt $attempt: could not resolve $ENGINE; retrying in $((attempt * 10))s..."
+            sleep $((attempt * 10))
+          done
 
           if [[ -z "$DL" || "$DL" == "null" ]]; then
             echo "Could not resolve Jaci engine artifact $ENGINE"
+            echo "Release currently available:"
+            curl -fsSL "$REL" | jq -r '.tag, (.assets[]?.name // empty)' || true
             exit 1
           fi
 
-          curl -fSL -o engine.zip "https://pop.squareweb.app$DL"
+          curl -fSL --retry 3 --retry-delay 5 -o engine.zip "https://pop.squareweb.app$DL"
 
           rm -rf /tmp/jaci
           mkdir -p /tmp/jaci
