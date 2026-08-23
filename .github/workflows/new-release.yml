@@ -98,7 +98,7 @@ jobs:
           mkdir -p smoke/src
           cat > smoke/src/init.luau <<'EOF'
 local Path = require("@klur/path")
-print("smoke:", Path.join("a", "b"))
+print("smoke:" .. Path.join("a", "b"))
 EOF
 
           ./bin/klur build smoke/src/init.luau --output smoke/app
@@ -108,9 +108,10 @@ EOF
           # self-contained.
           APP="$(pwd)/smoke/app"
           cd /
-          OUT="$("$APP")"
+          OUT="$("$APP" 2>&1)"
+          RC=$?
           echo "$OUT"
-          [[ "$OUT" == "smoke: a/b" ]] || { echo "smoke test failed"; exit 1; }
+          [[ $RC -eq 0 && "$OUT" == "smoke:a/b" ]] || { echo "smoke test failed (exit $RC)"; exit 1; }
 
   publish-release:
     name: publish-release
