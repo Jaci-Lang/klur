@@ -137,6 +137,8 @@ function Fs.unlink(targetPath: string): boolean
     return false
 end
 
+Fs.removeFile = Fs.unlink
+
 function Fs.rimraf(targetPath: string): boolean
     if not Fs.exists(targetPath) then return true end
     return Fs.unlink(targetPath)
