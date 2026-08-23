@@ -12,9 +12,31 @@ local Serde = {
     json = json,
 }
 
+-- Older Jaci builds decode JSON null to a lightuserdata sentinel (json.null)
+-- instead of nil. Normalize the decoded tree so Luau code sees standard
+-- semantics: JSON null == nil.
+local NULL_SENTINEL = json and json.null or nil
+
+local function denull(value: any): any
+    if value == NULL_SENTINEL then
+        return nil
+    end
+    if type(value) ~= "table" then
+        return value
+    end
+    local out = {}
+    for k, v in pairs(value) do
+        local dv = denull(v)
+        if dv ~= nil then
+            out[k] = dv
+        end
+    end
+    return out
+end
+
 function Serde.parseJson(str: string): any
     if json and json.decode then
-        return json.decode(str)
+        return denull(json.decode(str))
     end
     error("JSON library not available")
 end
