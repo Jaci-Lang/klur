@@ -82,9 +82,10 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          sudo cp /tmp/jaci/luau /usr/local/bin/luau \
-            || { cp /tmp/jaci/luau /usr/local/bin/luau 2>/dev/null || cp /tmp/jaci/luau "$HOME/bin/luau"; }
+          mkdir -p "$HOME/bin"
           echo "$HOME/bin" >> "$GITHUB_PATH"
+          sudo cp /tmp/jaci/luau /usr/local/bin/luau \
+            || cp /tmp/jaci/luau "$HOME/bin/luau"
 
       - name: Run KLUR Test Suite
         shell: bash
@@ -96,10 +97,10 @@ jobs:
           set -euo pipefail
 
           mkdir -p smoke/src
-          cat > smoke/src/init.luau <<'EOF'
-local Path = require("@klur/path")
-print("smoke:" .. Path.join("a", "b"))
-EOF
+          printf '%s\n' \
+            'local Path = require("@klur/path")' \
+            'print("smoke:" .. Path.join("a", "b"))' \
+            > smoke/src/init.luau
 
           ./bin/klur build smoke/src/init.luau --output smoke/app
           chmod +x smoke/app
@@ -108,8 +109,8 @@ EOF
           # self-contained.
           APP="$(pwd)/smoke/app"
           cd /
-          OUT="$("$APP" 2>&1)"
-          RC=$?
+          RC=0
+          OUT="$("$APP" 2>&1)" || RC=$?
           echo "$OUT"
           [[ $RC -eq 0 && "$OUT" == "smoke:a/b" ]] || { echo "smoke test failed (exit $RC)"; exit 1; }
 
