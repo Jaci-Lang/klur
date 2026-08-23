@@ -184,8 +184,10 @@ function Fs.move(src: string, dest: string): boolean
     local parent = Path.dirname(dest)
     Fs.mkdirp(parent)
     if fs and fs.move then
-        fs.move(src, dest)
-        return true
+        local ok = pcall(function()
+            fs.move(src, dest)
+        end)
+        if ok then return true end
     end
     if Fs.isDir(src) then
         Fs.copyDir(src, dest)
