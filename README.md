@@ -23,7 +23,44 @@
 
 ---
 
-## Installation & Quick Start
+## Installation
+
+KLUR ships as the KLUR layer of a Jaci toolchain. The recommended install path is **jaciup**, the official toolchain manager:
+
+```bash
+# 1. Install jaciup (macOS / Linux)
+curl -fsSL https://raw.githubusercontent.com/Jaci-Lang/jaciup/main/scripts/install.sh | bash
+
+# Windows (PowerShell)
+iwr -UseBasicParsing https://raw.githubusercontent.com/Jaci-Lang/jaciup/main/scripts/install.ps1 -OutFile install.ps1
+./install.ps1
+```
+
+```bash
+# 2. Install a toolchain (Jaci engine + KLUR layer), shims and shell PATH
+jaciup toolchain install latest
+```
+
+Open a new shell — `klur`, `luau`, `luau-analyze` and friends are on the PATH via `~/.jaciup/bin`. Useful flags:
+
+- `install.sh --with-toolchain` — steps 1 + 2 in one go.
+- `jaciup doctor` — diagnoses the installation (toolchains, shims, PATH).
+- `jaciup toolchain klur` — (re)installs the KLUR layer into the active toolchain.
+
+### From source (development)
+
+```bash
+git clone https://github.com/Jaci-Lang/klur.git
+cd klur
+JACI_BIN=/path/to/luau ./bin/klur test   # run the test suite
+JACI_BIN=/path/to/luau ./bin/klur init   # in a project directory
+```
+
+The `JACI_BIN` environment variable points the `klur` launcher at a Jaci/Luau
+engine binary (a `jaciup` toolchain install provides one at
+`~/.jaciup/toolchains/<version>/luau`).
+
+## Quick Start
 
 ### 1. Initialize a Project
 
