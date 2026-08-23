@@ -49,73 +49,79 @@ jobs:
         if: matrix.os.name == 'x86_64-unknown-linux-gnu'
         shell: bash
         run: |
-<<<<<<< HEAD
-          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=luau" | jq -r '.artifacts["${{ matrix.os.name }}"].url')
-          curl -fSL -o luau-ubuntu.zip "$URL"
-=======
           set -euo pipefail
 
-          curl -fsSL \
-            -o luau-ubuntu.zip \
-            https://github.com/Jaci-Lang/jaci/releases/latest/download/luau-ubuntu.zip \
-            || curl -fsSL \
-            -o luau-ubuntu.zip \
-            https://github.com/Jaci-Lang/jaci/releases/latest/download/luau-linux-x64.zip
+          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=luau" \
+            | jq -r '.artifacts["${{ matrix.os.name }}"].url')
+
+          if [[ -z "$URL" || "$URL" == "null" ]]; then
+            echo "Could not resolve Luau artifact URL for ${{ matrix.os.name }}"
+            exit 1
+          fi
+
+          curl -fSL -o luau-ubuntu.zip "$URL"
 
           rm -rf /tmp/jaci
           mkdir -p /tmp/jaci
 
->>>>>>> refs/remotes/origin/main
           unzip -o -q luau-ubuntu.zip -d /tmp/jaci
 
           chmod +x /tmp/jaci/*
 
           sudo cp /tmp/jaci/luau /usr/local/bin/luau \
-            || sudo cp /tmp/jaci/luau* /usr/local/bin/luau \
-            || true
+            || sudo cp /tmp/jaci/luau* /usr/local/bin/luau
 
       - name: Download Jaci Engine Bootstrap (macOS)
         if: matrix.os.name == 'x86_64-apple-darwin' || matrix.os.name == 'aarch64-apple-darwin'
         shell: bash
         run: |
-<<<<<<< HEAD
-          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=luau" | jq -r '.artifacts["${{ matrix.os.name }}"].url')
-          curl -fSL -o luau-macos.zip "$URL"
-=======
           set -euo pipefail
 
-          curl -fsSL \
-            -o luau-macos.zip \
-            https://github.com/Jaci-Lang/jaci/releases/latest/download/luau-macos.zip
+          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=luau" \
+            | jq -r '.artifacts["${{ matrix.os.name }}"].url')
+
+          if [[ -z "$URL" || "$URL" == "null" ]]; then
+            echo "Could not resolve Luau artifact URL for ${{ matrix.os.name }}"
+            exit 1
+          fi
+
+          curl -fSL -o luau-macos.zip "$URL"
 
           rm -rf /tmp/jaci
           mkdir -p /tmp/jaci
 
->>>>>>> refs/remotes/origin/main
           unzip -o -q luau-macos.zip -d /tmp/jaci
 
           chmod +x /tmp/jaci/*
 
           sudo cp /tmp/jaci/luau /usr/local/bin/luau \
-            || cp /tmp/jaci/luau /usr/local/bin/luau \
-            || true
+            || cp /tmp/jaci/luau /usr/local/bin/luau
 
       - name: Download Jaci Engine Bootstrap (Windows)
         if: matrix.os.name == 'x86_64-pc-windows-msvc'
         shell: powershell
         run: |
-<<<<<<< HEAD
-          $json = Invoke-RestMethod -Uri "https://pop.squareweb.app/v1/releases/latest?product=luau"
-          $url = $json.artifacts."${{ matrix.os.name }}".url
-          Invoke-WebRequest -Uri $url -OutFile luau-windows.zip
-          Expand-Archive -Path luau-windows.zip -DestinationPath C:\jaci -Force
-          echo "C:\jaci" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-=======
           $ErrorActionPreference = "Stop"
 
+          $json = Invoke-RestMethod `
+            -Uri "https://pop.squareweb.app/v1/releases/latest?product=luau"
+
+          $url = $json.artifacts."${{ matrix.os.name }}".url
+
+          if (-not $url) {
+            throw "Could not resolve Luau artifact URL for ${{ matrix.os.name }}"
+          }
+
           Invoke-WebRequest `
-            -Uri "https://github.com/Jaci-Lang/jaci/releases/latest/download/luau-windows.zip" `
+            -Uri $url `
             -OutFile "luau-windows.zip"
+
+          if (Test-Path "C:\jaci") {
+            Remove-Item `
+              -Path "C:\jaci" `
+              -Recurse `
+              -Force
+          }
 
           Expand-Archive `
             -Path "luau-windows.zip" `
@@ -127,7 +133,6 @@ jobs:
               -FilePath $env:GITHUB_PATH `
               -Encoding utf8 `
               -Append
->>>>>>> refs/remotes/origin/main
 
       - name: Build Standalone KLUR Binary (Unix)
         if: matrix.os.name != 'x86_64-pc-windows-msvc'
@@ -271,9 +276,9 @@ jobs:
             echo ""
 
             echo "### Highlights"
-            echo "- Standardized runtime batteries for Jaci in 100% pure Luau (\`@klur/*\`)."
-            echo "- Fast \`Packagefile\` package manager with relative symlinks and cache store (\`~/.klur/store/\`)."
-            echo "- Standalone single-binary compiler via \`klur build\`."
+            echo '- Standardized runtime batteries for Jaci in 100% pure Luau (`@klur/*`).'
+            echo '- Fast `Packagefile` package manager with relative symlinks and cache store (`~/.klur/store/`).'
+            echo '- Standalone single-binary compiler via `klur build`.'
             echo ""
 
             echo "### Changes & Commits"
@@ -324,7 +329,7 @@ jobs:
 
             echo ""
             echo "### Installation & Quick Start"
-            echo "\`\`\`bash"
+            echo '```bash'
             echo "# Download and unpack for your OS"
             echo "unzip klur-x86_64-unknown-linux-gnu.zip"
             echo "sudo mv klur /usr/local/bin/"
@@ -333,7 +338,7 @@ jobs:
             echo "klur init"
             echo "klur run src/init.luau"
             echo "klur test"
-            echo "\`\`\`"
+            echo '```'
           } > release_notes.md
 
           cat release_notes.md
