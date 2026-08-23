@@ -3,7 +3,6 @@
 
 local Fs = require("@klur/fs")
 local Path = require("@klur/path")
-local Process = require("@klur/process")
 local TestRunner = require("@klur/test/runner")
 local Term = require("@klur/term")
 
@@ -27,14 +26,19 @@ return function(args: any): number
 
     for _, file in ipairs(files) do
         TestRunner.clear()
-        local chunk, err = loadfile(file)
+        -- Load the test file via loadstring with an @-prefixed chunkname so
+        -- that the require navigator accepts it. A plain file-path chunkname
+        -- is rejected by the ReplRequirer's is_require_allowed check.
+        local contents = Fs.readFile(file)
+        local chunkname = "@" .. file
+        local chunk, err = loadstring(contents, chunkname)
         if not chunk then
-            print(Term.red("[error] ") .. "Failed to load test file " .. file .. ": " .. tostring(err))
+            print(Term.red("[error] ") .. "Failed to compile test file " .. file .. ": " .. tostring(err))
             totalPassed = false
         else
             local ok, runErr = pcall(chunk)
             if not ok then
-                print(Term.red("[error] ") .. "Error during test file evaluation " .. file .. ": " .. tostring(runErr))
+                print(Term.red("[error] ") .. "Error during test file " .. file .. ": " .. tostring(runErr))
                 totalPassed = false
             else
                 local results = TestRunner.run()

@@ -53,7 +53,7 @@ function Packagefile.load(filePath: string?): (PackageManifest?, string?)
     }
     setmetatable(env, { __index = _G })
 
-    -- loadstring is provided by the embedded runtime; fall back to load.
+    -- loadstring may be absent in some embedded runtimes; fall back to load.
     local compile = loadstring or load
     local chunk, err = compile(content, "@" .. path)
     if not chunk then

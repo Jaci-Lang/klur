@@ -13,7 +13,6 @@ local Path = {
 }
 
 function Path.normalize(p: string): string
-    if type(p) ~= "string" then return tostring(p or "") end
     if p == "" then return "." end
     local clean = p:gsub("\\", "/")
     local isAbs = clean:sub(1, 1) == "/"

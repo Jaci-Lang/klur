@@ -31,10 +31,32 @@ local KLUR = {
 -- native process
 local varargs = {...}
 local rawArgs = {}
-if process and process.args and #process.args > 0 then
-    rawArgs = process.args
-elseif #varargs > 0 then
+-- Prefer the native varargs (argv[1..argc-1]); fall back to process.args.
+-- process.args can be ambiguous in embedded runtimes, so varargs are primary.
+if #varargs > 0 then
     rawArgs = varargs
+elseif process and process.args and #process.args > 0 then
+    rawArgs = process.args
+end
+
+-- The luau -a marker (declare start of arguments) is passed through as a literal
+-- token by the runtime. Everything after the first -a is the program's argument
+-- list. Strip the leading tokens up to and including the first -a.
+do
+    local cut = 0
+    for i, v in ipairs(rawArgs) do
+        if v == "-a" then
+            cut = i
+            break
+        end
+    end
+    if cut > 0 then
+        local stripped = {}
+        for i = cut + 1, #rawArgs do
+            table.insert(stripped, rawArgs[i])
+        end
+        rawArgs = stripped
+    end
 end
 
 if #rawArgs > 0 then

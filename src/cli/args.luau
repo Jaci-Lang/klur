@@ -18,14 +18,16 @@ function Args.parse(argv: {string}): ParsedArgs
 
     while i <= #argv do
         local arg = argv[i]
+        if not arg then break end
         if arg:sub(1, 2) == "--" then
             local key, val = arg:sub(3):match("^([^=]+)=(.*)$")
             if key then
                 options[key] = val
             else
                 local flag = arg:sub(3)
-                if i + 1 <= #argv and argv[i + 1]:sub(1, 1) ~= "-" then
-                    options[flag] = argv[i + 1]
+                local nextArg = argv[i + 1]
+                if nextArg ~= nil and nextArg:sub(1, 1) ~= "-" then
+                    options[flag] = nextArg
                     i = i + 1
                 else
                     options[flag] = true
@@ -33,8 +35,9 @@ function Args.parse(argv: {string}): ParsedArgs
             end
         elseif arg:sub(1, 1) == "-" and #arg > 1 then
             local flag = arg:sub(2)
-            if i + 1 <= #argv and argv[i + 1]:sub(1, 1) ~= "-" then
-                options[flag] = argv[i + 1]
+            local nextArg = argv[i + 1]
+            if nextArg ~= nil and nextArg:sub(1, 1) ~= "-" then
+                options[flag] = nextArg
                 i = i + 1
             else
                 options[flag] = true
