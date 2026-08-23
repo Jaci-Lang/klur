@@ -19,7 +19,7 @@ jobs:
       - name: Download Pre-compiled Jaci / Luau Engine (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=luau" | jq -r '.artifacts["x86_64-unknown-linux-gnu"].url')
+          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=jaci" | jq -r '.artifacts["x86_64-unknown-linux-gnu"].url')
           curl -fSL -o luau-ubuntu.zip "$URL"
           unzip -o -q luau-ubuntu.zip -d /tmp/jaci
           chmod +x /tmp/jaci/*
@@ -28,7 +28,7 @@ jobs:
       - name: Download Pre-compiled Jaci / Luau Engine (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=luau" | jq -r '.artifacts["x86_64-apple-darwin"].url')
+          URL=$(curl -sL "https://pop.squareweb.app/v1/releases/latest?product=jaci" | jq -r '.artifacts["x86_64-apple-darwin"].url')
           curl -fSL -o luau-macos.zip "$URL"
           unzip -o -q luau-macos.zip -d /tmp/jaci
           chmod +x /tmp/jaci/*
@@ -38,7 +38,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
-          $json = Invoke-RestMethod -Uri "https://pop.squareweb.app/v1/releases/latest?product=luau"
+          $json = Invoke-RestMethod -Uri "https://pop.squareweb.app/v1/releases/latest?product=jaci"
           $url = $json.artifacts."x86_64-pc-windows-msvc".url
           Invoke-WebRequest -Uri $url -OutFile luau-windows.zip
           Expand-Archive -Path luau-windows.zip -DestinationPath C:\jaci -Force

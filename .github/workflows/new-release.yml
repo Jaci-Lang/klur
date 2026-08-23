@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=luau" \
+          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=jaci" \
             | jq -r '.artifacts["${{ matrix.os.name }}"].url')
 
           if [[ -z "$URL" || "$URL" == "null" ]]; then
@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=luau" \
+          URL=$(curl -fsSL "https://pop.squareweb.app/v1/releases/latest?product=jaci" \
             | jq -r '.artifacts["${{ matrix.os.name }}"].url')
 
           if [[ -z "$URL" || "$URL" == "null" ]]; then
@@ -104,7 +104,7 @@ jobs:
           $ErrorActionPreference = "Stop"
 
           $json = Invoke-RestMethod `
-            -Uri "https://pop.squareweb.app/v1/releases/latest?product=luau"
+            -Uri "https://pop.squareweb.app/v1/releases/latest?product=jaci"
 
           $url = $json.artifacts."${{ matrix.os.name }}".url
 
