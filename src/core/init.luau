@@ -70,6 +70,32 @@ function Core.getKlurHome(): string
     return home .. sep .. ".klur"
 end
 
+function Core.getTargetTriple(): string
+    local osName = Core.getPlatform()
+    local arch = Core.getArch()
+
+    if osName == "linux" then
+        if arch == "arm64" or arch == "aarch64" then
+            return "aarch64-unknown-linux-gnu"
+        else
+            return "x86_64-unknown-linux-gnu"
+        end
+    elseif osName == "macos" or osName == "darwin" then
+        if arch == "arm64" or arch == "aarch64" then
+            return "aarch64-apple-darwin"
+        else
+            return "x86_64-apple-darwin"
+        end
+    elseif osName == "windows" then
+        if arch == "arm64" or arch == "aarch64" then
+            return "aarch64-pc-windows-msvc"
+        else
+            return "x86_64-pc-windows-msvc"
+        end
+    end
+    return "x86_64-unknown-linux-gnu"
+end
+
 function Core.getStoreDir(): string
     local explicit = Core.getEnv("KLUR_STORE")
     if explicit and explicit ~= "" then
@@ -77,6 +103,20 @@ function Core.getStoreDir(): string
     end
     local sep = Core.isWindows() and "\\" or "/"
     return Core.getKlurHome() .. sep .. "store"
+end
+
+function Core.getBinDir(): string
+    local sep = Core.isWindows() and "\\" or "/"
+    return Core.getKlurHome() .. sep .. "bin"
+end
+
+function Core.getExtensionsDir(): string
+    local explicit = Core.getEnv("KLUR_EXTENSIONS")
+    if explicit and explicit ~= "" then
+        return explicit
+    end
+    local sep = Core.isWindows() and "\\" or "/"
+    return Core.getKlurHome() .. sep .. "extensions"
 end
 
 function Core.getLuauBinary(): string
