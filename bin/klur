@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# KLUR CLI Launcher
+
+# Resolve script directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+KLUR_DIR="$( cd -P "$( dirname "$SOURCE" )/.." >/dev/null 2>&1 && pwd )"
+
+# Find Luau / Jaci binary
+if command -v luau >/dev/null 2>&1; then
+    LUAU_BIN="$(command -v luau)"
+elif [ -f "$KLUR_DIR/../build/luau" ]; then
+    LUAU_BIN="$KLUR_DIR/../build/luau"
+elif [ -f "$KLUR_DIR/build/luau" ]; then
+    LUAU_BIN="$KLUR_DIR/build/luau"
+elif [ -f "$HOME/.klur/bin/luau" ]; then
+    LUAU_BIN="$HOME/.klur/bin/luau"
+else
+    echo "Error: Jaci/Luau runtime binary not found in PATH or build directory." >&2
+    exit 1
+fi
+
+export KLUR_HOME="${KLUR_HOME:-$HOME/.klur}"
+exec "$LUAU_BIN" "$KLUR_DIR/src/init.luau" -a "$@"

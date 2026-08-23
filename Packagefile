@@ -1,0 +1,16 @@
+return {
+    name = "@klur/runtime",
+    version = "0.1.0",
+    description = "Klee Luau Runtime - fast, standardized runtime, standard library batteries, and package manager toolchain for Jaci",
+    main = "src/init.luau",
+    bin = {
+        ["klur"] = "bin/klur",
+    },
+    scripts = {
+        ["test"] = "klur test",
+        ["info"] = "klur info",
+    },
+    dependencies = {},
+    devDependencies = {},
+    license = "MIT",
+}

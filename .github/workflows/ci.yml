@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    name: test-${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Jaci / Luau Engine
+        uses: actions/checkout@v4
+        with:
+          repository: klee-spec/jaci
+          path: jaci
+          fetch-depth: 1
+
+      - name: Build Jaci Engine (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd jaci
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target Luau.Repl.CLI -j 4
+          sudo cp build/luau /usr/local/bin/luau || cp build/luau /usr/local/bin/luau || true
+
+      - name: Build Jaci Engine (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd jaci
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target Luau.Repl.CLI -j 4
+          Copy-Item build/Release/luau.exe -Destination C:/Windows/System32/luau.exe -Force
+
+      - name: Run KLUR Test Suite
+        shell: bash
+        run: |
+          chmod +x bin/klur
+          ./bin/klur test

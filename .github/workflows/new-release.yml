@@ -1,0 +1,180 @@
+name: new-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        description: "Release version (e.g. 0.1.0 or v0.1.0)"
+      draft:
+        type: boolean
+        description: "Create as draft release"
+        default: false
+      prerelease:
+        type: boolean
+        description: "Mark as prerelease"
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [{name: linux-x64, runner: ubuntu-22.04}, {name: macos-x64, runner: macos-13}, {name: macos-arm64, runner: macos-14}, {name: windows-x64, runner: windows-latest}]
+    name: build-${{ matrix.os.name }}
+    runs-on: ${{ matrix.os.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Jaci Engine
+        uses: actions/checkout@v4
+        with:
+          repository: klee-spec/jaci
+          path: jaci
+          fetch-depth: 1
+
+      - name: Build Jaci Engine (Unix)
+        if: matrix.os.name != 'windows-x64'
+        run: |
+          cd jaci
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DLUAU_STRIP_BINARIES=ON -DLUAU_ENABLE_LTO=ON
+          cmake --build build --target Luau.Repl.CLI -j 4
+          sudo cp build/luau /usr/local/bin/luau || cp build/luau /usr/local/bin/luau || true
+
+      - name: Build Jaci Engine (Windows)
+        if: matrix.os.name == 'windows-x64'
+        run: |
+          cd jaci
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DLUAU_STRIP_BINARIES=ON -DLUAU_ENABLE_LTO=ON
+          cmake --build build --target Luau.Repl.CLI -j 4
+          Copy-Item build/Release/luau.exe -Destination C:/Windows/System32/luau.exe -Force
+
+      - name: Build Standalone KLUR Binary (Unix)
+        if: matrix.os.name != 'windows-x64'
+        run: |
+          mkdir -p dist
+          ./bin/klur build src/init.luau --output dist/klur
+          chmod +x dist/klur
+          cd dist
+          zip -j -9 ../klur-${{ matrix.os.name }}.zip klur
+
+      - name: Build Standalone KLUR Binary (Windows)
+        if: matrix.os.name == 'windows-x64'
+        run: |
+          mkdir -p dist
+          .\bin\klur.cmd build src/init.luau --output dist/klur.exe
+          7z a -mx=9 klur-${{ matrix.os.name }}.zip .\dist\klur.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: klur-${{ matrix.os.name }}
+          path: klur-${{ matrix.os.name }}.zip
+
+  publish-release:
+    name: publish-release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: ver
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.ref_name }}" ]; then
+            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=v0.1.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare Release Assets & Checksums
+        id: assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -name "*.zip" -exec cp {} release-assets/ \;
+          cd release-assets
+          find . -maxdepth 1 -type f ! -name "SHA256SUMS.txt" -exec sha256sum {} + | sed 's|\./||' > SHA256SUMS.txt
+          ls -la
+
+      - name: Generate Dynamic Release Notes
+        id: notes
+        run: |
+          VERSION="${{ steps.ver.outputs.VERSION }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude="$VERSION" HEAD^ 2>/dev/null || git describe --tags --abbrev=0 --exclude="$VERSION" 2>/dev/null || echo "")
+
+          echo "Detected previous tag: $PREV_TAG"
+
+          {
+            echo "## What's Changed in KLUR ${VERSION}"
+            echo ""
+            echo "### Highlights"
+            echo "- Modern, high-performance, standardized runtime for Jaci."
+            echo "- 100% Pure Luau standard library batteries suite (\`@klur/*\`)."
+            echo "- Package management with \`Packagefile\` (Luau format) and Git-based distribution."
+            echo "- Fast \`klur_modules/\` resolution and global content-addressable cache store (\`~/.klur/store/\`)."
+            echo "- Single-binary compilation via \`klur build\`."
+            echo ""
+            echo "### Changes & Commits"
+            if [ -n "$PREV_TAG" ]; then
+              CHANGES=$(git log "${PREV_TAG}..HEAD" --no-merges --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H)) by @%an" 2>/dev/null || true)
+              if [ -z "$CHANGES" ]; then
+                CHANGES="* No changes detected between ${PREV_TAG} and ${VERSION}."
+              fi
+              echo "$CHANGES"
+              echo ""
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}"
+            else
+              CHANGES=$(git log -n 50 --no-merges --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H)) by @%an" 2>/dev/null || true)
+              if [ -z "$CHANGES" ]; then
+                CHANGES="* Initial release."
+              fi
+              echo "$CHANGES"
+            fi
+            echo ""
+            echo "### Checksums & Cryptographic Verification"
+            echo "| File | SHA-256 Checksum |"
+            echo "| :--- | :--- |"
+            while read -r hash file; do
+              echo "| \`$file\` | \`$hash\` |"
+            done < release-assets/SHA256SUMS.txt
+            echo ""
+            echo "### Installation & Quick Start"
+            echo "\`\`\`bash"
+            echo "# Download and unpack for your OS"
+            echo "unzip klur-linux-x64.zip"
+            echo "sudo mv klur /usr/local/bin/"
+            echo ""
+            echo "# Initialize a new project"
+            echo "klur init"
+            echo "klur run src/init.luau"
+            echo "klur test"
+            echo "\`\`\`"
+          } > release_notes.md
+
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.VERSION }}
+          name: KLUR ${{ steps.ver.outputs.VERSION }}
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          body_path: release_notes.md
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
