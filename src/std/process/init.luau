@@ -1,28 +1,7 @@
 --!strict
 -- Enhanced Process Execution and Environment for KLUR
 
-local Path = require("@self/../fs/path")
-
-type ProcessGlobals = {
-    cwd: (() -> string)?,
-    chdir: ((string) -> ())?,
-    pid: number?,
-    getpid: (() -> number)?,
-    exit: ((number) -> ())?,
-    env: {[string]: string}?,
-    args: {string}?,
-    os: string?,
-    arch: string?,
-    spawn: ((string, {string}) -> any)?,
-}
-
-type FsGlobals = {
-    cwd: (() -> string)?,
-    exists: ((string) -> boolean)?,
-}
-
-local _process: ProcessGlobals? = (_G :: any).process
-local _fs: FsGlobals? = (_G :: any).fs
+local Path = require("@klur/path")
 
 export type SpawnOptions = {
     cwd: string?,
@@ -41,24 +20,19 @@ export type ProcessResult = {
 local Process = {}
 
 function Process.cwd(): string
-    local p = _process
-    if p and p.cwd then
-        return p.cwd()
+    if process and process.cwd then
+        return process.cwd()
     end
-    local f = _fs
-    if f and f.cwd then
-        return f.cwd()
+    if fs and fs.cwd then
+        return fs.cwd()
     end
     return "."
 end
 
 function Process.chdir(dir: string): boolean
-    local p = _process
-    if p and p.chdir then
+    if process and process.chdir then
         local ok = pcall(function()
-            if p and p.chdir then
-                p.chdir(dir)
-            end
+            process.chdir(dir)
         end)
         return ok
     end
@@ -66,13 +40,12 @@ function Process.chdir(dir: string): boolean
 end
 
 function Process.pid(): number
-    local p = _process
-    if p then
-        if p.pid then
-            return p.pid
+    if process then
+        if process.pid then
+            return process.pid
         end
-        if p.getpid then
-            return p.getpid()
+        if process.getpid then
+            return process.getpid()
         end
     end
     return 0
@@ -80,27 +53,25 @@ end
 
 function Process.exit(code: number?)
     local c = code or 0
-    local p = _process
-    if p and p.exit then
-        p.exit(c)
+    if process and process.exit then
+        process.exit(c)
     elseif os and os.exit then
         os.exit(c)
     end
 end
 
 function Process.env(key: string, value: string?): string?
-    local p = _process
     if value ~= nil then
         if os and os.setenv then
             os.setenv(key, value)
         end
-        if p and p.env then
-            p.env[key] = value
+        if process and process.env then
+            process.env[key] = value
         end
         return value
     else
-        if p and p.env and p.env[key] then
-            return p.env[key]
+        if process and process.env and process.env[key] then
+            return process.env[key]
         end
         if os and os.getenv then
             return os.getenv(key)
@@ -115,20 +86,19 @@ function Process.which(cmd: string): string?
     end
     local pathEnv = Process.env("PATH") or ""
     local sep = Path.delimiter
-    local f = _fs
     for dir in pathEnv:gmatch("[^" .. sep .. "]+") do
         local candidate = Path.join(dir, cmd)
-        if f and f.exists and f.exists(candidate) then
+        if fs and fs.exists and fs.exists(candidate) then
             return candidate
         end
         if Path.isWindows then
-            if f and f.exists and f.exists(candidate .. ".exe") then
+            if fs and fs.exists and fs.exists(candidate .. ".exe") then
                 return candidate .. ".exe"
             end
-            if f and f.exists and f.exists(candidate .. ".cmd") then
+            if fs and fs.exists and fs.exists(candidate .. ".cmd") then
                 return candidate .. ".cmd"
             end
-            if f and f.exists and f.exists(candidate .. ".bat") then
+            if fs and fs.exists and fs.exists(candidate .. ".bat") then
                 return candidate .. ".bat"
             end
         end
@@ -151,9 +121,8 @@ function Process.spawn(cmd: string, args: {string}?, opts: SpawnOptions?): Proce
         stderr = "",
     }
 
-    local p = _process
-    if p and p.spawn then
-        local raw: any = p.spawn(cmd, argList)
+    if process and process.spawn then
+        local raw = process.spawn(cmd, argList)
         if raw then
             result.exitCode = raw.exitcode or 0
             result.stdout = raw.stdout or ""

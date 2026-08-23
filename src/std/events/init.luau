@@ -1,6 +1,8 @@
 --!strict
 -- High performance Event Emitter and Observer pattern for KLUR
 
+local Async = require("@klur/async")
+
 export type Listener = (...any) -> ...any
 
 export type EventEmitter = {
@@ -40,8 +42,10 @@ end
 function EventEmitterImpl.once(self: any, event: string, listener: Listener): () -> ()
     local unsub: any = nil
     local wrapper = function(...)
-        if unsub then unsub() end
-        return listener(...)
+        if unsub then
+            (unsub :: any)()
+        end
+        return (listener :: any)(...)
     end
     unsub = (self :: any):on(event, wrapper)
     return unsub
@@ -91,7 +95,6 @@ function EventEmitterImpl.emit(self: any, event: string, ...: any): boolean
 end
 
 function EventEmitterImpl.emitAsync(self: any, event: string, ...: any): any
-    local Async = require("@klur/async")
     local list = self._events[event]
     local wildcard = self._events["*"]
 
@@ -107,7 +110,7 @@ function EventEmitterImpl.emitAsync(self: any, event: string, ...: any): any
             local copy = table.clone(list)
             for _, fn in ipairs(copy) do
                 local p = Async.Promise.new(function(res: any, rej: any)
-                    local ok, err = pcall(fn, table.unpack(args))
+                    local ok, err = pcall(fn :: any, table.unpack(args))
                     if ok then res(nil) else rej(err) end
                 end)
                 table.insert(promises, p)
@@ -118,7 +121,7 @@ function EventEmitterImpl.emitAsync(self: any, event: string, ...: any): any
             local copyW = table.clone(wildcard)
             for _, fn in ipairs(copyW) do
                 local p = Async.Promise.new(function(res: any, rej: any)
-                    local ok, err = pcall(fn, event, table.unpack(args))
+                    local ok, err = pcall(fn :: any, event, table.unpack(args))
                     if ok then res(nil) else rej(err) end
                 end)
                 table.insert(promises, p)

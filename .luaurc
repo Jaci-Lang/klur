@@ -1,7 +1,6 @@
 {
     "languageMode": "strict",
     "aliases": {
-        "klur": "./src",
-        "self": "./src"
+        "klur": "./klur_modules/@klur"
     }
 }

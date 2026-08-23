@@ -59,9 +59,9 @@ function Toml.encode(tbl: {[string]: any}): string
         if type(v) == "table" and not (v[1] ~= nil) then
             subTables[k] = v
         elseif type(v) == "string" then
-            table.insert(out, string.format("%s = %q", k, v))
+            table.insert(out, string.format("%s = %q", tostring(k), v :: string))
         elseif type(v) == "boolean" or type(v) == "number" then
-            table.insert(out, string.format("%s = %s", k, tostring(v)))
+            table.insert(out, string.format("%s = %s", tostring(k), tostring(v)))
         elseif type(v) == "table" and v[1] ~= nil then
             local items = {}
             for _, item in ipairs(v) do
@@ -86,7 +86,10 @@ function Toml.encode(tbl: {[string]: any}): string
         end
     end
 
-    return table.concat(out, "\n") .. "\n"
+    return table.concat(out, "\n")
 end
+
+Toml.parse = Toml.decode
+Toml.stringify = Toml.encode
 
 return Toml

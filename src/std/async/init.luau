@@ -23,9 +23,9 @@ function Async.promise<T>(executor: (resolve: (T) -> (), reject: (any) -> ()) ->
         status = "pending" :: PromiseStatus,
         value = nil,
         error = nil,
-        _fulfilledCallbacks = {},
-        _rejectedCallbacks = {},
-        _thread = nil,
+        _fulfilledCallbacks = {} :: { (any) -> () },
+        _rejectedCallbacks = {} :: { (any) -> () },
+        _thread = nil :: thread?,
     }, PromiseObj)
 
     local function resolve(val: any)
@@ -54,19 +54,17 @@ function Async.promise<T>(executor: (resolve: (T) -> (), reject: (any) -> ()) ->
         end
     end
 
-    task.spawn(function()
-        local ok, err = pcall(executor, resolve, reject)
-        if not ok then
-            reject(err)
-        end
-    end)
+    local ok, err = pcall(executor, resolve, reject)
+    if not ok then
+        reject(err)
+    end
 
-    return self :: any
+    return (self :: any) :: Promise<T>
 end
 
-function PromiseObj:then_(onFulfilled, onRejected)
+function PromiseObj.then_(self: any, onFulfilled: any?, onRejected: any?): any
     return Async.promise(function(resolve, reject)
-        local function handleFulfilled(val)
+        local function handleFulfilled(val: any)
             if onFulfilled then
                 local ok, res = pcall(onFulfilled, val)
                 if ok then resolve(res) else reject(res) end
@@ -75,7 +73,7 @@ function PromiseObj:then_(onFulfilled, onRejected)
             end
         end
 
-        local function handleRejected(err)
+        local function handleRejected(err: any)
             if onRejected then
                 local ok, res = pcall(onRejected, err)
                 if ok then resolve(res) else reject(res) end
@@ -95,115 +93,135 @@ function PromiseObj:then_(onFulfilled, onRejected)
     end)
 end
 
-function PromiseObj:catch_(onRejected)
-    return self:then_(nil, onRejected)
+function PromiseObj.catch_(self: any, onRejected: any): any
+    return (self :: any):then_(nil, onRejected)
 end
 
-function PromiseObj:finally_(onFinally)
-    return self:then_(
-        function(val) onFinally(); return val end,
-        function(err) onFinally(); error(err) end
+function PromiseObj.finally_(self: any, onFinally: any): any
+    return (self :: any):then_(
+        function(val: any)
+            onFinally()
+            return val
+        end,
+        function(err: any)
+            onFinally()
+            error(err)
+        end
     )
 end
 
-function PromiseObj:await_()
+PromiseObj["await"] = function(self: any): (boolean, any)
     if self.status == "fulfilled" then
         return true, self.value
     elseif self.status == "rejected" then
         return false, self.error
     end
 
-    self._thread = coroutine.running()
-    local ok, res = coroutine.yield()
-    return ok, res
+    local currentThread = coroutine.running()
+    self._thread = currentThread
+    return coroutine.yield()
 end
-
-PromiseObj.await = PromiseObj.await_
 
 function Async.resolve<T>(val: T): Promise<T>
-    return Async.promise(function(resolve) resolve(val) end)
+    return Async.promise(function(resolve)
+        resolve(val)
+    end)
 end
 
-function Async.reject(err: any): Promise<any>
-    return Async.promise(function(_, reject) reject(err) end)
+function Async.reject<T>(err: any): Promise<T>
+    return Async.promise(function(_, reject)
+        reject(err)
+    end)
 end
 
-function Async.all(promises: {Promise<any>}): Promise<{any}>
+function Async.all(promises: {any}): any
     return Async.promise(function(resolve, reject)
         if #promises == 0 then
             resolve({})
             return
         end
-        local results = {}
-        local pending = #promises
+
+        local results = table.create(#promises)
+        local remaining = #promises
+
         for i, p in ipairs(promises) do
-            p:then_(function(val)
-                results[i] = val
-                pending = pending - 1
-                if pending == 0 then
-                    resolve(results)
+            p:then_(
+                function(val: any)
+                    results[i] = val
+                    remaining -= 1
+                    if remaining == 0 then
+                        resolve(results)
+                    end
+                end,
+                function(err: any)
+                    reject(err)
                 end
-            end, function(err)
-                reject(err)
-            end)
+            )
         end
     end)
 end
 
-function Async.sleep(seconds: number)
-    if task and task.wait then
-        task.wait(seconds)
-    elseif task and task.sleep then
-        task.sleep(seconds)
-    else
-        local start = os.clock()
-        while os.clock() - start < seconds do end
-    end
+function Async.race(promises: {any}): any
+    return Async.promise(function(resolve, reject)
+        for _, p in ipairs(promises) do
+            p:then_(resolve, reject)
+        end
+    end)
 end
 
-function Async.retry<T>(fn: () -> T, opts: {maxAttempts: number?, delay: number?, backoff: number?}?): T
-    local maxAttempts = (opts and opts.maxAttempts) or 3
-    local delay = (opts and opts.delay) or 0.5
-    local backoff = (opts and opts.backoff) or 2.0
+function Async.sleep(seconds: number): number
+    return task.wait(seconds)
+end
 
-    local lastErr: any = nil
-    for attempt = 1, maxAttempts do
+export type RetryOptions = {
+    maxAttempts: number?,
+    delay: number?,
+    delayMs: number?,
+    backoff: number?,
+    backoffFactor: number?,
+}
+
+function Async.retry(fn: () -> any, optionsOrMaxAttempts: (RetryOptions | number)?, delayMs: number?, backoffFactor: number?): any
+    local max = 3
+    local delay = 0.1
+    local backoff = 2
+
+    if type(optionsOrMaxAttempts) == "table" then
+        local opts = optionsOrMaxAttempts :: RetryOptions
+        max = opts.maxAttempts or max
+        if opts.delay then
+            delay = opts.delay
+        elseif opts.delayMs then
+            delay = opts.delayMs / 1000
+        end
+        backoff = opts.backoff or opts.backoffFactor or backoff
+    elseif type(optionsOrMaxAttempts) == "number" then
+        max = optionsOrMaxAttempts
+        if delayMs then delay = delayMs / 1000 end
+        if backoffFactor then backoff = backoffFactor end
+    end
+
+    local lastErr = nil
+    for attempt = 1, max do
         local ok, res = pcall(fn)
         if ok then
             return res
         end
         lastErr = res
-        if attempt < maxAttempts then
+        if attempt < max then
             Async.sleep(delay)
             delay = delay * backoff
         end
     end
-    error("Retry failed after " .. maxAttempts .. " attempts: " .. tostring(lastErr))
+    error("Retry failed after " .. max .. " attempts: " .. tostring(lastErr))
 end
 
-function Async.pLimit(concurrency: number)
-    local queue = {}
-    local active = 0
-
-    local function next()
-        if active < concurrency and #queue > 0 then
-            active = active + 1
-            local item = table.remove(queue, 1)
-            task.spawn(function()
-                local ok, res = pcall(item.fn)
-                active = active - 1
-                if ok then item.resolve(res) else item.reject(res) end
-                next()
-            end)
-        end
-    end
-
-    return function<T>(fn: () -> T): Promise<T>
-        return Async.promise(function(resolve, reject)
-            table.insert(queue, { fn = fn, resolve = resolve, reject = reject })
-            next()
-        end)
-    end
-end
+Async.Promise = {
+    new = Async.promise,
+    resolve = Async.resolve,
+    reject = Async.reject,
+    all = Async.all,
+    race = Async.race,
+}
 
 return Async

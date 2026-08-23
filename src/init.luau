@@ -28,11 +28,11 @@ local KLUR = {
 }
 
 -- If executed directly from CLI
-local _process = (_G :: any).process
+-- native process
 local varargs = {...}
 local rawArgs = {}
-if _process and _process.args and #_process.args > 0 then
-    rawArgs = _process.args
+if process and process.args and #process.args > 0 then
+    rawArgs = process.args
 elseif #varargs > 0 then
     rawArgs = varargs
 end

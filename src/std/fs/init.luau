@@ -264,22 +264,22 @@ end
 function Fs.readJson(filePath: string): any?
     local raw = Fs.readFileOpt(filePath)
     if not raw then return nil end
-    local _json = (_G :: any).json
-    if _json and _json.decode then
-        local ok, data = pcall(function() return _json.decode(raw) end)
+    -- native json
+    if json and json.decode then
+        local ok, data = pcall(function() return json.decode(raw) end)
         return ok and data or nil
     end
     return nil
 end
 
 function Fs.writeJson(filePath: string, data: any, pretty: boolean?): boolean
-    local _json = (_G :: any).json
-    if _json and _json.encode then
+    -- native json
+    if json and json.encode then
         local str = ""
-        if pretty and _json.pretty then
-            str = _json.pretty(data)
+        if pretty and json.pretty then
+            str = json.pretty(data)
         else
-            str = _json.encode(data)
+            str = json.encode(data)
         end
         return Fs.atomicWrite(filePath, str .. "\n")
     end

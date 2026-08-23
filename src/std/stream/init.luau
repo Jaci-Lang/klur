@@ -132,7 +132,7 @@ function WritableImpl.write(self: any, chunk: string): boolean
     end
     table.insert(self._buffer, chunk)
     if self._sink then
-        self._sink(chunk)
+        (self._sink :: any)(chunk)
     end
     self._emitter:emit("data", chunk)
     return true

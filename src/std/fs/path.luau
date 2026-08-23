@@ -24,7 +24,7 @@ function Path.normalize(p: string): string
         clean = clean:sub(3)
     end
 
-    local segments = {}
+    local segments: {string} = {}
     for part in clean:gmatch("[^/]+") do
         if part == "." then
             -- Skip current dir
@@ -66,57 +66,57 @@ end
 
 function Path.join(...: string): string
     local parts = {...}
-    local filtered = {}
+    local cleanParts: {string} = {}
     for _, part in ipairs(parts) do
-        if type(part) == "string" and part ~= "" then
-            table.insert(filtered, part)
+        if part and part ~= "" then
+            table.insert(cleanParts, part)
         end
     end
-    if #filtered == 0 then return "." end
-    return Path.normalize(table.concat(filtered, isWindows and "\\" or "/"))
+    if #cleanParts == 0 then return "." end
+    local joined = table.concat(cleanParts, "/")
+    return Path.normalize(joined)
 end
 
 function Path.resolve(...: string): string
     local parts = {...}
-    local cwd = (fs and fs.cwd) and fs.cwd() or (process and process.cwd and process.cwd()) or "."
-    local resolved = ""
+    local cwd = "."
+    if process and process.cwd then
+        cwd = process.cwd()
+    elseif fs and fs.cwd then
+        cwd = fs.cwd()
+    end
 
-    for i = #parts, 1, -1 do
-        local part = parts[i]
-        if type(part) == "string" and part ~= "" then
-            if Path.isAbsolute(part) then
-                resolved = Path.join(part, resolved)
-                break
-            else
-                resolved = Path.join(part, resolved)
-            end
+    local resolved = cwd
+    for _, part in ipairs(parts) do
+        if Path.isAbsolute(part) then
+            resolved = part
+        else
+            resolved = resolved .. "/" .. part
         end
     end
-
-    if not Path.isAbsolute(resolved) then
-        resolved = Path.join(cwd, resolved)
-    end
-
     return Path.normalize(resolved)
 end
 
 function Path.dirname(p: string): string
     local norm = Path.normalize(p)
-    local sep = isWindows and "\\" or "/"
-    local idx = norm:match("^.*()" .. (isWindows and "[\\/]" or "/"))
-    if not idx then
+    if isWindows then norm = norm:gsub("\\", "/") end
+    local lastSlash = norm:match("^(.*)/[^/]*$")
+    if not lastSlash then
+        if norm:sub(1, 1) == "/" then return "/" end
         return "."
     end
-    if idx == 1 then
-        return sep
+    if lastSlash == "" then return "/" end
+    if isWindows then
+        return (lastSlash:gsub("/", "\\"))
     end
-    return norm:sub(1, idx - 1)
+    return lastSlash
 end
 
 function Path.basename(p: string, ext: string?): string
     local norm = Path.normalize(p)
-    local name = norm:match("[^\\/]+$") or ""
-    if ext and #ext > 0 and name:sub(-#ext) == ext then
+    if isWindows then norm = (norm:gsub("\\", "/")) end
+    local name = norm:match("([^/]+)$") or norm
+    if ext and ext ~= "" and #name >= #ext and name:sub(-#ext) == ext then
         name = name:sub(1, -#ext - 1)
     end
     return name
@@ -136,9 +136,9 @@ function Path.relative(from: string, to: string): string
     local toNorm = Path.resolve(to)
     if fromNorm == toNorm then return "" end
 
-    local fromParts = {}
+    local fromParts: {string} = {}
     for part in fromNorm:gmatch("[^\\/]+") do table.insert(fromParts, part) end
-    local toParts = {}
+    local toParts: {string} = {}
     for part in toNorm:gmatch("[^\\/]+") do table.insert(toParts, part) end
 
     local same = 0
@@ -146,8 +146,8 @@ function Path.relative(from: string, to: string): string
         same = same + 1
     end
 
-    local result = {}
-    for i = same + 1, #fromParts do
+    local result: {string} = {}
+    for _ = same + 1, #fromParts do
         table.insert(result, "..")
     end
     for i = same + 1, #toParts do

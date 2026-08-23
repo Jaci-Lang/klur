@@ -35,8 +35,8 @@ function Store.linkInto(sourcePath: string, targetPath: string): boolean
     Fs.rimraf(targetPath)
 
     if not Path.isWindows then
-        -- POSIX symlink using ln -sf
-        local res = Process.spawn("ln", {"-sf", Path.resolve(sourcePath), targetPath})
+        local relSource = Path.relative(parent, sourcePath)
+        local res = Process.spawn("ln", {"-sfn", relSource, targetPath})
         if res.ok then return true end
     end
 

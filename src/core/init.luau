@@ -4,8 +4,8 @@
 local Version = require("@self/version")
 local Errors = require("@self/errors")
 
-local _process = (_G :: any).process
-local _fs = (_G :: any).fs
+-- native process
+-- native fs
 
 local Core = {
     VERSION = "0.1.0",
@@ -16,15 +16,15 @@ local Core = {
 }
 
 function Core.getPlatform(): string
-    if _process and _process.os then
-        return _process.os
+    if process and process.os then
+        return process.os
     end
     return "unknown"
 end
 
 function Core.getArch(): string
-    if _process and _process.arch then
-        return _process.arch
+    if process and process.arch then
+        return process.arch
     end
     return "unknown"
 end
@@ -46,8 +46,8 @@ function Core.getEnv(key: string, default: string?): string?
         local val = os.getenv(key)
         if val ~= nil and val ~= "" then return val end
     end
-    if _process and _process.env then
-        local val = _process.env[key]
+    if process and process.env then
+        local val = process.env[key]
         if val ~= nil and val ~= "" then return val end
     end
     return default
@@ -82,17 +82,18 @@ end
 function Core.getLuauBinary(): string
     if os and os.getenv then
         local envBin = os.getenv("JACI_BIN") or os.getenv("LUAU_BIN")
-        if envBin and envBin ~= "" and _fs and _fs.exists and _fs.exists(envBin) then
+        if envBin and envBin ~= "" and fs and fs.exists and fs.exists(envBin) then
             return envBin
         end
     end
 
     local candidates = {
-        "/home/klee/Documentos/jaci/build/luau",
         Core.getKlurHome() .. "/bin/luau",
+        "build/luau",
+        "../build/luau",
     }
     for _, c in ipairs(candidates) do
-        if _fs and _fs.exists and _fs.exists(c) then
+        if fs and fs.exists and fs.exists(c) then
             return c
         end
     end

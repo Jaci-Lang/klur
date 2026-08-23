@@ -16,28 +16,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Jaci / Luau Engine
-        uses: actions/checkout@v4
-        with:
-          repository: klee-spec/jaci
-          path: jaci
-          fetch-depth: 1
-
-      - name: Build Jaci Engine (Unix)
-        if: matrix.os != 'windows-latest'
+      - name: Download Pre-compiled Jaci / Luau Engine (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          cd jaci
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target Luau.Repl.CLI -j 4
-          sudo cp build/luau /usr/local/bin/luau || cp build/luau /usr/local/bin/luau || true
+          curl -fsSL -o luau-ubuntu.zip https://github.com/klee-spec/jaci/releases/latest/download/luau-ubuntu.zip || curl -fsSL -o luau-ubuntu.zip https://github.com/klee-spec/jaci/releases/latest/download/luau-linux-x64.zip
+          unzip -o -q luau-ubuntu.zip -d /tmp/jaci
+          chmod +x /tmp/jaci/*
+          sudo cp /tmp/jaci/luau /usr/local/bin/luau || sudo cp /tmp/jaci/luau* /usr/local/bin/luau || true
 
-      - name: Build Jaci Engine (Windows)
+      - name: Download Pre-compiled Jaci / Luau Engine (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          curl -fsSL -o luau-macos.zip https://github.com/klee-spec/jaci/releases/latest/download/luau-macos.zip
+          unzip -o -q luau-macos.zip -d /tmp/jaci
+          chmod +x /tmp/jaci/*
+          sudo cp /tmp/jaci/luau /usr/local/bin/luau || cp /tmp/jaci/luau /usr/local/bin/luau || true
+
+      - name: Download Pre-compiled Jaci / Luau Engine (Windows)
         if: matrix.os == 'windows-latest'
+        shell: powershell
         run: |
-          cd jaci
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target Luau.Repl.CLI -j 4
-          Copy-Item build/Release/luau.exe -Destination C:/Windows/System32/luau.exe -Force
+          Invoke-WebRequest -Uri https://github.com/klee-spec/jaci/releases/latest/download/luau-windows.zip -OutFile luau-windows.zip
+          Expand-Archive -Path luau-windows.zip -DestinationPath C:\jaci -Force
+          echo "C:\jaci" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Run KLUR Test Suite
         shell: bash

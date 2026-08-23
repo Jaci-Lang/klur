@@ -56,4 +56,20 @@ function Term.stripAnsi(str: string): string
     return (str:gsub("\27%[[0-9;]*m", ""))
 end
 
+function Term.log(...: any)
+    print(...)
+end
+
+function Term.success(msg: string)
+    print(Term.green("✓ ") .. msg)
+end
+
+function Term.error(msg: string)
+    print(Term.red("error: ") .. msg)
+end
+
+function Term.warn(msg: string)
+    print(Term.yellow("warning: ") .. msg)
+end
+
 return Term

@@ -23,9 +23,9 @@ function Crypto.sha256(msg: string): string
     local h0, h1, h2, h3 = 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a
     local h4, h5, h6, h7 = 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
 
-    local bytes = {}
+    local bytes: {number} = {}
     for i = 1, #msg do
-        table.insert(bytes, string.byte(msg, i))
+        bytes[i] = (string.byte(msg, i))
     end
 
     local origBitLen = #bytes * 8
@@ -116,9 +116,9 @@ end
 function Crypto.md5(msg: string): string
     local a0, b0, c0, d0 = 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476
 
-    local bytes = {}
+    local bytes: {number} = {}
     for i = 1, #msg do
-        table.insert(bytes, string.byte(msg, i))
+        bytes[i] = (string.byte(msg, i))
     end
 
     local bitLen = #bytes * 8
@@ -219,9 +219,9 @@ end
 local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 function Crypto.base64Encode(data: string): string
-    local bytes = {}
+    local bytes: {number} = {}
     for i = 1, #data do
-        table.insert(bytes, string.byte(data, i))
+        bytes[i] = (string.byte(data, i))
     end
 
     local out = {}
