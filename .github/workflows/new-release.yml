@@ -111,17 +111,19 @@ jobs:
       - name: Download Jaci Engine Bootstrap (Windows)
         if: matrix.os.name == 'x86_64-pc-windows-msvc'
         shell: powershell
+        env:
+          TRIPLE: ${{ matrix.os.name }}
         run: |
           $ErrorActionPreference = "Stop"
 
           $json = Invoke-RestMethod `
             -Uri "https://pop.squareweb.app/v1/releases/latest?product=jaci"
 
-          $name = "luau-$(${{ matrix.os.name }}).zip"
+          $name = "luau-" + $env:TRIPLE + ".zip"
           $asset = $json.assets | Where-Object { $_.name -eq $name } | Select-Object -First 1
 
           if (-not $asset) {
-            throw "Could not resolve Jaci artifact URL for ${{ matrix.os.name }}"
+            throw "Could not resolve Jaci artifact URL for $env:TRIPLE"
           }
 
           $url = "https://pop.squareweb.app" + $asset.download_url
