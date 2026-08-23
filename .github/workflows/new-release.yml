@@ -14,22 +14,6 @@ on:
         type: boolean
         description: "Mark as prerelease"
         default: false
-      build_linux_x86_64:
-        type: boolean
-        description: "Build x86_64-unknown-linux-gnu"
-        default: true
-      build_macos_x86_64:
-        type: boolean
-        description: "Build x86_64-apple-darwin (macOS Intel)"
-        default: true
-      build_macos_arm64:
-        type: boolean
-        description: "Build aarch64-apple-darwin (macOS Apple Silicon)"
-        default: true
-      build_windows_x64:
-        type: boolean
-        description: "Build x86_64-pc-windows-msvc (Windows x64)"
-        default: true
 
   push:
     tags:
@@ -38,183 +22,100 @@ on:
 permissions:
   contents: write
 
+# KLUR is distributed as one platform-neutral source archive. The engine
+# (platform-specific) comes from the Jaci releases; jaciup unpacks this
+# archive into the toolchain and wraps it with a launcher. `klur build`
+# remains available for users to produce single binaries of their own
+# applications.
+
 jobs:
-  build:
+  test:
     strategy:
       fail-fast: false
       matrix:
-        os: >-
-          ${{ fromJSON((
-          ((inputs.build_linux_x86_64 == true)  ? '[{"name":"x86_64-unknown-linux-gnu","runner":"ubuntu-22.04"}]' : '') +
-          ((inputs.build_macos_x86_64 == true)  ? '[{"name":"x86_64-apple-darwin","runner":"macos-13"}]' : '') +
-          ((inputs.build_macos_arm64 == true)   ? '[{"name":"aarch64-apple-darwin","runner":"macos-14"}]' : '') +
-          ((inputs.build_windows_x64 == true)   ? '[{"name":"x86_64-pc-windows-msvc","runner":"windows-latest"}]' : '')
-          ).replaceAll('][',',') || '[]') }}
+        include:
+          - triple: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+            engine: luau-x86_64-unknown-linux-gnu.zip
+          - triple: aarch64-apple-darwin
+            runner: macos-14
+            # The engine currently ships x86_64 for macOS; Apple Silicon
+            # runners run it through Rosetta.
+            engine: luau-x86_64-apple-darwin.zip
 
-    name: build-${{ matrix.os.name }}
-    runs-on: ${{ matrix.os.runner }}
+    name: test-${{ matrix.triple }}
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Jaci Engine Bootstrap (Ubuntu)
-        if: matrix.os.name == 'x86_64-unknown-linux-gnu'
+      - name: Download Jaci Engine
         shell: bash
-        run: |
-          set -euo pipefail
-
-          REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
-          NAME="luau-${{ matrix.os.name }}.zip"
-          DL=$(curl -fsSL "$REL" \
-            | jq -r ".assets[] | select(.name==\"$NAME\") | .download_url")
-
-          if [[ -z "$DL" || "$DL" == "null" ]]; then
-            echo "Could not resolve Jaci artifact URL for ${{ matrix.os.name }}"
-            exit 1
-          fi
-
-          curl -fSL -o luau-ubuntu.zip "https://pop.squareweb.app$DL"
-
-          rm -rf /tmp/jaci
-          mkdir -p /tmp/jaci
-
-          unzip -o -q luau-ubuntu.zip -d /tmp/jaci
-
-          chmod +x /tmp/jaci/*
-
-          sudo cp /tmp/jaci/luau /usr/local/bin/luau \
-            || sudo cp /tmp/jaci/luau* /usr/local/bin/luau
-
-      - name: Download Jaci Engine Bootstrap (macOS)
-        if: matrix.os.name == 'x86_64-apple-darwin' || matrix.os.name == 'aarch64-apple-darwin'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
-          NAME="luau-${{ matrix.os.name }}.zip"
-          DL=$(curl -fsSL "$REL" \
-            | jq -r ".assets[] | select(.name==\"$NAME\") | .download_url")
-
-          # The Jaci engine only ships x86_64-apple-darwin; Apple Silicon runners
-          # (aarch64-apple-darwin) fall back to it via Rosetta.
-          if [[ -z "$DL" || "$DL" == "null" ]]; then
-            DL=$(curl -fsSL "$REL" \
-              | jq -r '.assets[] | select(.name=="luau-x86_64-apple-darwin.zip") | .download_url')
-          fi
-
-          if [[ -z "$DL" || "$DL" == "null" ]]; then
-            echo "Could not resolve Jaci artifact URL for ${{ matrix.os.name }}"
-            exit 1
-          fi
-
-          curl -fSL -o luau-macos.zip "https://pop.squareweb.app$DL"
-
-          rm -rf /tmp/jaci
-          mkdir -p /tmp/jaci
-
-          unzip -o -q luau-macos.zip -d /tmp/jaci
-
-          chmod +x /tmp/jaci/*
-
-          sudo cp /tmp/jaci/luau /usr/local/bin/luau \
-            || cp /tmp/jaci/luau /usr/local/bin/luau
-
-      - name: Download Jaci Engine Bootstrap (Windows)
-        if: matrix.os.name == 'x86_64-pc-windows-msvc'
-        shell: powershell
         env:
-          TRIPLE: ${{ matrix.os.name }}
+          ENGINE: ${{ matrix.engine }}
         run: |
-          $ErrorActionPreference = "Stop"
+          set -euo pipefail
 
-          $json = Invoke-RestMethod `
-            -Uri "https://pop.squareweb.app/v1/releases/latest?product=jaci"
+          REL="https://pop.squareweb.app/v1/releases/latest?product=jaci"
 
-          $name = "luau-" + $env:TRIPLE + ".zip"
-          $asset = $json.assets | Where-Object { $_.name -eq $name } | Select-Object -First 1
+          DL=$(curl -fsSL "$REL" \
+            | jq -r ".assets[] | select(.name==\"$ENGINE\") | .download_url")
 
-          if (-not $asset) {
-            throw "Could not resolve Jaci artifact URL for $env:TRIPLE"
-          }
+          if [[ -z "$DL" || "$DL" == "null" ]]; then
+            echo "Could not resolve Jaci engine artifact $ENGINE"
+            exit 1
+          fi
 
-          $url = "https://pop.squareweb.app" + $asset.download_url
+          curl -fSL -o engine.zip "https://pop.squareweb.app$DL"
 
-          Invoke-WebRequest `
-            -Uri $url `
-            -OutFile "luau-windows.zip"
+          rm -rf /tmp/jaci
+          mkdir -p /tmp/jaci
+          unzip -o -q engine.zip -d /tmp/jaci
+          chmod +x /tmp/jaci/*
 
-          if (Test-Path "C:\jaci") {
-            Remove-Item `
-              -Path "C:\jaci" `
-              -Recurse `
-              -Force
-          }
+      - name: Install Engine
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo cp /tmp/jaci/luau /usr/local/bin/luau
 
-          Expand-Archive `
-            -Path "luau-windows.zip" `
-            -DestinationPath "C:\jaci" `
-            -Force
+      - name: Install Engine
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          sudo cp /tmp/jaci/luau /usr/local/bin/luau \
+            || { cp /tmp/jaci/luau /usr/local/bin/luau 2>/dev/null || cp /tmp/jaci/luau "$HOME/bin/luau"; }
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
-          "C:\jaci" |
-            Out-File `
-              -FilePath $env:GITHUB_PATH `
-              -Encoding utf8 `
-              -Append
+      - name: Run KLUR Test Suite
+        shell: bash
+        run: ./bin/klur test
 
-      - name: Build Standalone KLUR Binary (Unix)
-        if: matrix.os.name != 'x86_64-pc-windows-msvc'
+      - name: Single-Binary Smoke Test
         shell: bash
         run: |
           set -euo pipefail
 
-          mkdir -p dist
+          mkdir -p smoke/src
+          cat > smoke/src/init.luau <<'EOF'
+local Path = require("@klur/path")
+print("smoke:", Path.join("a", "b"))
+EOF
 
-          ./bin/klur build \
-            src/init.luau \
-            --output dist/klur
+          ./bin/klur build smoke/src/init.luau --output smoke/app
+          chmod +x smoke/app
 
-          chmod +x dist/klur
-
-          cd dist
-
-          zip -j -9 \
-            "../klur-${{ matrix.os.name }}.zip" \
-            klur
-
-      - name: Build Standalone KLUR Binary (Windows)
-        if: matrix.os.name == 'x86_64-pc-windows-msvc'
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path dist |
-            Out-Null
-
-          .\bin\klur.cmd build `
-            src/init.luau `
-            --output dist/klur.exe
-
-          7z a `
-            -mx=9 `
-            "klur-${{ matrix.os.name }}.zip" `
-            ".\dist\klur.exe"
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: klur-${{ matrix.os.name }}
-          path: klur-${{ matrix.os.name }}.zip
-          if-no-files-found: error
-          retention-days: 1
+          # Run from a different working directory: the binary must be
+          # self-contained.
+          APP="$(pwd)/smoke/app"
+          cd /
+          OUT="$("$APP")"
+          echo "$OUT"
+          [[ "$OUT" == "smoke: a/b" ]] || { echo "smoke test failed"; exit 1; }
 
   publish-release:
     name: publish-release
     needs:
-      - build
+      - test
     runs-on: ubuntu-latest
 
     steps:
@@ -244,33 +145,44 @@ jobs:
             echo "VERSION=v0.1.0" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare Release Assets & Checksums
-        id: assets
+      - name: Assemble Platform-Neutral Archive
+        id: zip
         shell: bash
         run: |
           set -euo pipefail
 
+          VERSION_TAG="${{ steps.ver.outputs.VERSION }}"
+          VERSION_TAG="${VERSION_TAG#v}"
+
           mkdir -p release-assets
 
-          find artifacts \
-            -type f \
-            -name "*.zip" \
-            -exec cp {} release-assets/ \;
+          STAGE="klur-${VERSION_TAG}"
+          mkdir -p "$STAGE/packages/@klur"
+
+          # Source tree: the launcher (generated by jaciup) runs
+          # <engine> <toolchain>/src/init.luau.
+          cp -r src "$STAGE/src"
+          cp -r bin "$STAGE/bin"
+
+          # The standard library as a package, resolvable from the
+          # toolchain root by the engine's neutral package pattern
+          # (<root>/packages/@klur/<module>).
+          cp -r src/std/. "$STAGE/packages/@klur/"
+
+          # Config, manifest and docs.
+          cp .luaurc "$STAGE/.luaurc"
+          cp Packagefile "$STAGE/Packagefile"
+          cp README.md "$STAGE/README.md"
+          cp LICENSE "$STAGE/LICENSE"
+
+          (
+            cd "$STAGE"
+            zip -r -9 "../release-assets/klur-${VERSION_TAG}.zip" .
+          )
 
           cd release-assets
-
-          for f in *.zip; do
-            sha256sum "$f" |
-              awk '{print $1}' \
-              > "$f.sha256"
-          done
-
-          sha256sum *.zip > SHA256SUMS.txt
+          sha256sum "klur-${VERSION_TAG}.zip" > "klur-${VERSION_TAG}.zip.sha256"
+          cp "klur-${VERSION_TAG}.zip.sha256" SHA256SUMS.txt
 
           ls -la
 
@@ -281,6 +193,7 @@ jobs:
           set -euo pipefail
 
           VERSION="${{ steps.ver.outputs.VERSION }}"
+          VERSION_TAG="${VERSION#v}"
 
           PREV_TAG=$(
             git describe \
@@ -306,7 +219,8 @@ jobs:
             echo "### Highlights"
             echo '- Standardized runtime batteries for Jaci in 100% pure Luau (`@klur/*`).'
             echo '- Fast `Packagefile` package manager with relative symlinks and cache store (`~/.klur/store/`).'
-            echo '- Standalone single-binary compiler via `klur build`.'
+            echo '- Single-binary compiler for applications via `klur build`.'
+            echo '- One platform-neutral archive: install with `jaciup toolchain install`.'
             echo ""
 
             echo "### Changes & Commits"
@@ -358,14 +272,11 @@ jobs:
             echo ""
             echo "### Installation & Quick Start"
             echo '```bash'
-            echo "# Download and unpack for your OS"
-            echo "unzip klur-x86_64-unknown-linux-gnu.zip"
-            echo "sudo mv klur /usr/local/bin/"
+            echo "# With jaciup (recommended): installs engine + KLUR"
+            echo "jaciup toolchain install latest"
             echo ""
-            echo "# Initialize a new project"
-            echo "klur init"
-            echo "klur run src/init.luau"
-            echo "klur test"
+            echo "# Manually: unpack the archive next to a Jaci engine"
+            echo "unzip klur-${VERSION_TAG}.zip -d ~/.jaciup/toolchains/mytoolchain"
             echo '```'
           } > release_notes.md
 
