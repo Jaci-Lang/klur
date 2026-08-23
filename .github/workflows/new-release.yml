@@ -14,9 +14,21 @@ on:
         type: boolean
         description: "Mark as prerelease"
         default: false
+      build_linux_x86_64:
+        type: boolean
+        description: "Build x86_64-unknown-linux-gnu"
+        default: true
       build_macos_x86_64:
         type: boolean
-        description: "Build macOS x86_64 (Intel)"
+        description: "Build x86_64-apple-darwin (macOS Intel)"
+        default: true
+      build_macos_arm64:
+        type: boolean
+        description: "Build aarch64-apple-darwin (macOS Apple Silicon)"
+        default: true
+      build_windows_x64:
+        type: boolean
+        description: "Build x86_64-pc-windows-msvc (Windows x64)"
         default: true
 
   push:
@@ -31,13 +43,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(
-          github.event_name != 'workflow_dispatch' || inputs.build_macos_x86_64
-          &&
-          '[{"name":"x86_64-unknown-linux-gnu","runner":"ubuntu-22.04"},{"name":"x86_64-apple-darwin","runner":"macos-13"},{"name":"aarch64-apple-darwin","runner":"macos-14"},{"name":"x86_64-pc-windows-msvc","runner":"windows-latest"}]'
-          ||
-          '[{"name":"x86_64-unknown-linux-gnu","runner":"ubuntu-22.04"},{"name":"aarch64-apple-darwin","runner":"macos-14"},{"name":"x86_64-pc-windows-msvc","runner":"windows-latest"}]'
-          ) }}
+        os: >-
+          ${{ fromJSON((
+          ((inputs.build_linux_x86_64 == true)  ? '[{"name":"x86_64-unknown-linux-gnu","runner":"ubuntu-22.04"}]' : '') +
+          ((inputs.build_macos_x86_64 == true)  ? '[{"name":"x86_64-apple-darwin","runner":"macos-13"}]' : '') +
+          ((inputs.build_macos_arm64 == true)   ? '[{"name":"aarch64-apple-darwin","runner":"macos-14"}]' : '') +
+          ((inputs.build_windows_x64 == true)   ? '[{"name":"x86_64-pc-windows-msvc","runner":"windows-latest"}]' : '')
+          ).replaceAll('][',',') || '[]') }}
 
     name: build-${{ matrix.os.name }}
     runs-on: ${{ matrix.os.runner }}

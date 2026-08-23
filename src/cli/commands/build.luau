@@ -26,17 +26,21 @@ return function(args: any): number
 
     print(Term.cyan("Building standalone native executable: ") .. Term.bold(entry) .. " -> " .. Term.bold(output))
 
-    local luauBin = Core.getLuauBinary()
+    -- Prefer the engine this klur is running on: in source mode it is the
+    -- luau binary; in a single binary it is the binary itself, which accepts
+    -- --build as an engine flag. Fall back to PATH/build-dir discovery.
+    local builder = (process and process.executable) or Core.getLuauBinary()
     local buildArgs = {"--build", entry, "-o", output, "--direct"}
 
     if codegen then table.insert(buildArgs, "--codegen") end
     if strip then table.insert(buildArgs, "--strip") end
     if compress then table.insert(buildArgs, "--compress") end
 
-    local res = Process.spawn(luauBin, buildArgs)
+    local res = Process.spawn(builder, buildArgs)
+    if #res.stderr > 0 then io.stderr:write(res.stderr) end
+    if #res.stdout > 0 then io.write(res.stdout) end
     if not res.ok then
-        print(Term.red("[error] ") .. "Build failed:")
-        if #res.stderr > 0 then print(res.stderr) end
+        print(Term.red("[error] ") .. "Build failed (exit code " .. res.exitCode .. ")")
         return res.exitCode
     end
 

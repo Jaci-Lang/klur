@@ -59,11 +59,12 @@ do
     end
 end
 
-if #rawArgs > 0 then
-    local exitCode = CLI.main(rawArgs)
-    if exitCode ~= 0 then
-        Std.process.exit(exitCode)
-    end
+-- Always dispatch to the CLI. With no arguments this prints help, matching
+-- the behavior of `klur -h`; previously an empty argument list fell through
+-- and the binary exited silently.
+local exitCode = CLI.main(rawArgs)
+if exitCode ~= 0 then
+    Std.process.exit(exitCode)
 end
 
 return KLUR
