@@ -1,9 +1,9 @@
 --!strict
 -- Entry point for KLUR runtime and toolchain
 
-local Core = require("@self/core")
+local Core = require("@self/std/core")
 local Std = require("@self/std")
-local PM = require("@self/pm")
+local PM = require("@self/std/pm")
 local CLI = require("@self/cli")
 
 local KLUR = {

@@ -1,6 +1,6 @@
 {
     "languageMode": "strict",
     "aliases": {
-        "klur": "./klur_modules/@klur"
+        "klur": "./src/std"
     }
 }

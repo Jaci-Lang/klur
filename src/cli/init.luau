@@ -88,7 +88,7 @@ function CLI.main(argv: {string}): number
             return CmdRun(parsed)
         else
             -- Check if it is a script name in Packagefile
-            local Packagefile = require("../pm/packagefile")
+            local Packagefile = require("../std/pm/packagefile")
             local manifest = Packagefile.load()
             if manifest and manifest.scripts and manifest.scripts[cmd] then
                 return CmdRun(parsed)

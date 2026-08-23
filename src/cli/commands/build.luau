@@ -36,6 +36,30 @@ return function(args: any): number
     if strip then table.insert(buildArgs, "--strip") end
     if compress then table.insert(buildArgs, "--compress") end
 
+    -- Solver: embed the package directories the static graph cannot reach.
+    -- Project-local packages are found by the runtime walk-up on their own,
+    -- but modules only reached through dynamically-loaded chunks (test files
+    -- via loadstring) and the toolchain packages living next to the engine
+    -- must be carried explicitly. The engine stays neutral: it only embeds
+    -- what it is told to.
+    local function addEmbed(dir: string)
+        if dir ~= "" and Fs.isDir(dir) then
+            table.insert(buildArgs, "--embed")
+            table.insert(buildArgs, dir)
+        end
+    end
+
+    local pkgDirNames = {"klur_modules", "luau_packages", "packages", "node_modules"}
+    local cwd = Process.cwd()
+    for _, name in pkgDirNames do
+        addEmbed(Path.join(cwd, name))
+    end
+
+    local exeDir = Path.dirname(builder)
+    for _, name in pkgDirNames do
+        addEmbed(Path.join(exeDir, name))
+    end
+
     local res = Process.spawn(builder, buildArgs)
     if #res.stderr > 0 then io.stderr:write(res.stderr) end
     if #res.stdout > 0 then io.write(res.stdout) end
