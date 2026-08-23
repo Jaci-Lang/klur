@@ -11,20 +11,20 @@ standalone native binary.
 
 ## Install
 
-KLUR ships as part of a Jaci toolchain, installed by **jaciup**:
+**jaciup** (the toolchain manager) installs the engine and the KLUR layer
+in one step:
+
+macOS / Linux:
 
 ```bash
-# 1. Install jaciup (macOS / Linux)
 curl -fsSL https://raw.githubusercontent.com/Jaci-Lang/jaciup/main/scripts/install.sh | bash
-
-# Windows (PowerShell)
-iwr -UseBasicParsing https://raw.githubusercontent.com/Jaci-Lang/jaciup/main/scripts/install.ps1 -OutFile install.ps1
-./install.ps1
 ```
 
-```bash
-# 2. Install a toolchain (Jaci engine + KLUR), shims and shell PATH
-jaciup toolchain install latest
+Windows (PowerShell):
+
+```powershell
+iwr -UseBasicParsing https://raw.githubusercontent.com/Jaci-Lang/jaciup/main/scripts/install.ps1 -OutFile install.ps1
+./install.ps1
 ```
 
 Open a new shell: `klur`, `luau`, and friends are on the PATH.
