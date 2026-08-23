@@ -301,7 +301,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.VERSION }}
-          name: KLUR ${{ steps.ver.outputs.VERSION }}
+          name: ${{ steps.ver.outputs.VERSION }}
           draft: ${{ github.event.inputs.draft || false }}
           prerelease: ${{ github.event.inputs.prerelease || false }}
           body_path: release_notes.md
