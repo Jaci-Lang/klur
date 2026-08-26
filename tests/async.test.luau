@@ -22,14 +22,25 @@ Test.describe("Std: Async & Promises", function()
     end)
 
     Test.it("should chain then handlers", function()
-        local p = Async.resolve(10):then_(function(n)
+        local p = Async.resolve(10):andThen(function(n)
             return n * 2
-        end):then_(function(n)
+        end):andThen(function(n)
             return n + 5
         end)
         local ok, val = p:await()
         expect(ok).toBe(true)
         expect(val).toBe(25)
+    end)
+
+    Test.it("should assimilate foreign thenables", function()
+        local thenable = {
+            ["then"] = function(_, resolve)
+                resolve("foreign value")
+            end,
+        }
+        local ok, value = Async.resolve(thenable):await()
+        expect(ok).toBe(true)
+        expect(value).toBe("foreign value")
     end)
 
     Test.it("should resolve Async.all", function()

@@ -9,6 +9,7 @@ export type Promise<T> = {
     status: PromiseStatus,
     value: T?,
     error: any?,
+    andThen: (self: any, onFulfilled: ((T) -> any)?, onRejected: ((any) -> any)?) -> any,
     then_: (self: any, onFulfilled: ((T) -> any)?, onRejected: ((any) -> any)?) -> any,
     catch_: (self: any, onRejected: (any) -> any) -> any,
     finally_: (self: any, onFinally: () -> ()) -> any,
@@ -17,6 +18,28 @@ export type Promise<T> = {
 
 local PromiseObj = {}
 PromiseObj.__index = PromiseObj
+
+local function adopt(value: any, resolve: (any) -> (), reject: (any) -> ()): boolean
+    if type(value) ~= "table" then
+        return false
+    end
+
+    local foreignThen = value["then"]
+    if type(foreignThen) == "function" then
+        local ok, err = pcall(foreignThen, value, resolve, reject)
+        if not ok then reject(err) end
+        return true
+    end
+
+    local andThen = value.andThen
+    if type(andThen) == "function" then
+        local ok, err = pcall(andThen, value, resolve, reject)
+        if not ok then reject(err) end
+        return true
+    end
+
+    return false
+end
 
 function Async.promise<T>(executor: (resolve: (T) -> (), reject: (any) -> ()) -> ()): Promise<T>
     local self = setmetatable({
@@ -28,20 +51,10 @@ function Async.promise<T>(executor: (resolve: (T) -> (), reject: (any) -> ()) ->
         _thread = nil :: thread?,
     }, PromiseObj)
 
-    local function resolve(val: any)
-        if self.status ~= "pending" then return end
-        self.status = "fulfilled"
-        self.value = val
-        for _, cb in ipairs(self._fulfilledCallbacks) do
-            cb(val)
-        end
-        if self._thread then
-            task.spawn(self._thread, true, val)
-            self._thread = nil
-        end
-    end
+    local resolve: (any) -> ()
+    local reject: (any) -> ()
 
-    local function reject(err: any)
+    reject = function(err: any)
         if self.status ~= "pending" then return end
         self.status = "rejected"
         self.error = err
@@ -54,6 +67,24 @@ function Async.promise<T>(executor: (resolve: (T) -> (), reject: (any) -> ()) ->
         end
     end
 
+    resolve = function(val: any)
+        if self.status ~= "pending" then return end
+        if val == self then
+            reject("Promise cannot resolve itself")
+            return
+        end
+        if adopt(val, resolve, reject) then return end
+        self.status = "fulfilled"
+        self.value = val
+        for _, cb in ipairs(self._fulfilledCallbacks) do
+            cb(val)
+        end
+        if self._thread then
+            task.spawn(self._thread, true, val)
+            self._thread = nil
+        end
+    end
+
     local ok, err = pcall(executor, resolve, reject)
     if not ok then
         reject(err)
@@ -62,7 +93,7 @@ function Async.promise<T>(executor: (resolve: (T) -> (), reject: (any) -> ()) ->
     return (self :: any) :: Promise<T>
 end
 
-function PromiseObj.then_(self: any, onFulfilled: any?, onRejected: any?): any
+function PromiseObj.andThen(self: any, onFulfilled: any?, onRejected: any?): any
     return Async.promise(function(resolve, reject)
         local function handleFulfilled(val: any)
             if onFulfilled then
@@ -93,12 +124,14 @@ function PromiseObj.then_(self: any, onFulfilled: any?, onRejected: any?): any
     end)
 end
 
+PromiseObj.then_ = PromiseObj.andThen
+
 function PromiseObj.catch_(self: any, onRejected: any): any
-    return (self :: any):then_(nil, onRejected)
+    return (self :: any):andThen(nil, onRejected)
 end
 
 function PromiseObj.finally_(self: any, onFinally: any): any
-    return (self :: any):then_(
+    return (self :: any):andThen(
         function(val: any)
             onFinally()
             return val
@@ -145,18 +178,16 @@ function Async.all(promises: {any}): any
         local remaining = #promises
 
         for i, p in ipairs(promises) do
-            p:then_(
-                function(val: any)
-                    results[i] = val
-                    remaining -= 1
-                    if remaining == 0 then
-                        resolve(results)
-                    end
-                end,
-                function(err: any)
-                    reject(err)
+            local function fulfilled(val: any)
+                results[i] = val
+                remaining -= 1
+                if remaining == 0 then
+                    resolve(results)
                 end
-            )
+            end
+            if not adopt(p, fulfilled, reject) then
+                fulfilled(p)
+            end
         end
     end)
 end
@@ -164,7 +195,9 @@ end
 function Async.race(promises: {any}): any
     return Async.promise(function(resolve, reject)
         for _, p in ipairs(promises) do
-            p:then_(resolve, reject)
+            if not adopt(p, resolve, reject) then
+                resolve(p)
+            end
         end
     end)
 end
